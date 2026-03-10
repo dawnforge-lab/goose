@@ -227,8 +227,7 @@ impl CodeExecutionClient {
             .ok_or("Missing arguments for execute")?;
 
         let code_mode = self.get_code_mode(session_id).await?;
-        let (registry, content_store) =
-            self.build_callback_registry(session_id, &code_mode)?;
+        let (registry, content_store) = self.build_callback_registry(session_id, &code_mode)?;
         let code = args.input.code.clone();
 
         // Deno runtime is not Send, so we need to run it in a blocking task
@@ -268,7 +267,8 @@ impl CodeExecutionClient {
             .is_some_and(|m| {
                 m.contains_key("_goose_content_ref")
                     && m.len() <= 2
-                    && m.keys().all(|k| k == "_goose_content_ref" || k == "text_result")
+                    && m.keys()
+                        .all(|k| k == "_goose_content_ref" || k == "text_result")
             });
 
         if is_pure_ref && !rich_contents.is_empty() {
