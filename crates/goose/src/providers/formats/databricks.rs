@@ -366,12 +366,8 @@ pub fn response_to_message(response: &Value) -> anyhow::Result<Message> {
                         Ok(params) => {
                             content.push(MessageContent::tool_request(
                                 id,
-                                Ok(CallToolRequestParams {
-                                    meta: None,
-                                    task: None,
-                                    name: function_name.into(),
-                                    arguments: Some(object(params)),
-                                }),
+                                Ok(CallToolRequestParams::new(function_name)
+                                    .with_arguments(object(params))),
                             ));
                         }
                         Err(e) => {
@@ -763,12 +759,8 @@ mod tests {
             Message::user().with_text("How are you?"),
             Message::assistant().with_tool_request(
                 "tool1",
-                Ok(CallToolRequestParams {
-                    meta: None,
-                    task: None,
-                    name: "example".into(),
-                    arguments: Some(object!({"param1": "value1"})),
-                }),
+                Ok(CallToolRequestParams::new("example")
+                    .with_arguments(object!({"param1": "value1"}))),
             ),
         ];
 
@@ -780,12 +772,7 @@ mod tests {
 
         messages.push(Message::user().with_tool_response(
             tool_id,
-            Ok(CallToolResult {
-                content: vec![Content::text("Result")],
-                structured_content: None,
-                is_error: Some(false),
-                meta: None,
-            }),
+            Ok(CallToolResult::success(vec![Content::text("Result")])),
         ));
 
         let as_value =
@@ -810,12 +797,7 @@ mod tests {
     fn test_format_messages_multiple_content() -> anyhow::Result<()> {
         let mut messages = vec![Message::assistant().with_tool_request(
             "tool1",
-            Ok(CallToolRequestParams {
-                meta: None,
-                task: None,
-                name: "example".into(),
-                arguments: Some(object!({"param1": "value1"})),
-            }),
+            Ok(CallToolRequestParams::new("example").with_arguments(object!({"param1": "value1"}))),
         )];
 
         let tool_id = if let MessageContent::ToolRequest(request) = &messages[0].content[0] {
@@ -826,12 +808,7 @@ mod tests {
 
         messages.push(Message::user().with_tool_response(
             tool_id,
-            Ok(CallToolResult {
-                content: vec![Content::text("Result")],
-                structured_content: None,
-                is_error: Some(false),
-                meta: None,
-            }),
+            Ok(CallToolResult::success(vec![Content::text("Result")])),
         ));
 
         let as_value =
@@ -1192,15 +1169,8 @@ mod tests {
     #[test]
     fn test_format_messages_tool_request_with_none_arguments() -> anyhow::Result<()> {
         // Test that tool calls with None arguments are formatted as "{}" string
-        let message = Message::assistant().with_tool_request(
-            "tool1",
-            Ok(CallToolRequestParams {
-                meta: None,
-                task: None,
-                name: "test_tool".into(),
-                arguments: None, // This is the key case the fix addresses
-            }),
-        );
+        let message = Message::assistant()
+            .with_tool_request("tool1", Ok(CallToolRequestParams::new("test_tool")));
 
         let spec = format_messages(&[message], &ImageFormat::OpenAi);
         let as_value = serde_json::to_value(spec)?;
@@ -1225,12 +1195,8 @@ mod tests {
         // Test that tool calls with Some arguments are properly JSON-serialized
         let message = Message::assistant().with_tool_request(
             "tool1",
-            Ok(CallToolRequestParams {
-                meta: None,
-                task: None,
-                name: "test_tool".into(),
-                arguments: Some(object!({"param": "value", "number": 42})),
-            }),
+            Ok(CallToolRequestParams::new("test_tool")
+                .with_arguments(object!({"param": "value", "number": 42}))),
         );
 
         let spec = format_messages(&[message], &ImageFormat::OpenAi);
@@ -1407,12 +1373,7 @@ mod tests {
 
         let message = Message::assistant().with_tool_request_with_metadata(
             "tool1",
-            Ok(CallToolRequestParams {
-                meta: None,
-                task: None,
-                name: "test_tool".into(),
-                arguments: Some(object!({"param": "value"})),
-            }),
+            Ok(CallToolRequestParams::new("test_tool").with_arguments(object!({"param": "value"}))),
             Some(&metadata),
             None,
         );
@@ -1544,12 +1505,7 @@ mod tests {
 
         let message = Message::assistant().with_tool_request_with_metadata(
             "tool1",
-            Ok(CallToolRequestParams {
-                meta: None,
-                task: None,
-                name: "test_tool".into(),
-                arguments: None,
-            }),
+            Ok(CallToolRequestParams::new("test_tool")),
             Some(&metadata),
             None,
         );

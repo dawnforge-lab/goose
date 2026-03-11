@@ -292,11 +292,12 @@ fn process_response_part_impl(
 
             Some(MessageContent::tool_request_with_metadata(
                 id,
-                Ok(CallToolRequestParams {
-                    meta: None,
-                    task: None,
-                    name: name.to_string().into(),
-                    arguments,
+                Ok({
+                    let mut params = CallToolRequestParams::new(name.to_string());
+                    if let Some(args) = arguments {
+                        params = params.with_arguments(args);
+                    }
+                    params
                 }),
                 metadata.as_ref(),
             ))
@@ -634,12 +635,7 @@ mod tests {
             0,
             vec![MessageContent::tool_response(
                 id.to_string(),
-                Ok(CallToolResult {
-                    content: tool_response,
-                    structured_content: None,
-                    is_error: Some(false),
-                    meta: None,
-                }),
+                Ok(CallToolResult::success(tool_response)),
             )],
         )
     }
@@ -713,21 +709,11 @@ mod tests {
         let messages = vec![
             set_up_tool_request_message(
                 "id",
-                CallToolRequestParams {
-                    meta: None,
-                    task: None,
-                    name: "tool_name".into(),
-                    arguments: Some(object(arguments.clone())),
-                },
+                CallToolRequestParams::new("tool_name").with_arguments(object(arguments.clone())),
             ),
             set_up_action_required_message(
                 "id2",
-                CallToolRequestParams {
-                    meta: None,
-                    task: None,
-                    name: "tool_name_2".into(),
-                    arguments: Some(object(arguments.clone())),
-                },
+                CallToolRequestParams::new("tool_name_2").with_arguments(object(arguments.clone())),
             ),
         ];
         let payload = format_messages(&messages);
@@ -964,12 +950,7 @@ mod tests {
     }
 
     fn tool_result(text: &str) -> CallToolResult {
-        CallToolResult {
-            content: vec![Content::text(text)],
-            structured_content: None,
-            is_error: Some(false),
-            meta: None,
-        }
+        CallToolResult::success(vec![Content::text(text)])
     }
 
     #[test]
