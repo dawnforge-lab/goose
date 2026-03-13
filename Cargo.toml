@@ -19,7 +19,7 @@ uninlined_format_args = "allow"
 string_slice = "warn"
 
 [workspace.dependencies]
-rmcp = { version = "1.2.0", features = ["schemars", "auth"] }
+rmcp = { git = "https://github.com/wpfleger96/rust-sdk.git", branch = "main", features = ["schemars", "auth"] }
 sacp = "10.1.0"
 anyhow = "1.0"
 async-stream = "0.3"

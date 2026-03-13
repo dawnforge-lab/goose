@@ -307,7 +307,7 @@ fn extract_auth_error(
                 }
                 #[cfg(unix)]
                 if let Some(StreamableHttpError::AuthRequired(e)) = error
-                    .downcast_ref::<StreamableHttpError<super::unix_socket_http_client::UnixSocketError>>()
+                    .downcast_ref::<StreamableHttpError<rmcp::transport::common::unix_socket::UnixSocketError>>()
                 {
                     return Some(e);
                 }
@@ -526,38 +526,38 @@ async fn create_unix_socket_http_client(
     capabilities: GooseMcpClientCapabilities,
     roots_dir: &std::path::Path,
 ) -> ExtensionResult<Box<dyn McpClientTrait>> {
-    use super::unix_socket_http_client::UnixSocketHttpClient;
-    use http::header::HeaderValue;
+    use rmcp::transport::UnixSocketHttpClient;
 
-    #[cfg(not(target_os = "linux"))]
-    if socket_path.starts_with('@') {
-        return Err(ExtensionError::ConfigError(
-            "Abstract Unix sockets (@-prefixed) are only supported on Linux".to_string(),
-        ));
-    }
-
-    let mut default_headers = std::collections::HashMap::new();
-    default_headers.insert(reqwest::header::USER_AGENT, GOOSE_USER_AGENT);
+    let mut custom_headers = HashMap::new();
+    custom_headers.insert(
+        reqwest::header::USER_AGENT,
+        GOOSE_USER_AGENT
+            .to_str()
+            .unwrap_or("goose")
+            .parse()
+            .unwrap(),
+    );
     for (key, value) in headers {
         let header_name = HeaderName::try_from(key)
             .map_err(|_| ExtensionError::ConfigError(format!("invalid header: {key}")))?;
-        let val: HeaderValue = value
+        let val: reqwest::header::HeaderValue = value
             .parse()
             .map_err(|_| ExtensionError::ConfigError(format!("invalid header value: {key}")))?;
-        default_headers.insert(header_name, val);
+        custom_headers.insert(header_name, val);
     }
 
     let retry_headers = {
-        let mut h = default_headers.clone();
-        h.remove(&http::header::AUTHORIZATION);
+        let mut h = custom_headers.clone();
+        h.remove(&reqwest::header::AUTHORIZATION);
         h
     };
 
-    let unix_client = UnixSocketHttpClient::new(uri, socket_path, default_headers);
+    let unix_client = UnixSocketHttpClient::new(socket_path, uri);
     let transport = StreamableHttpClientTransport::with_client(
-        unix_client,
+        unix_client.clone(),
         StreamableHttpClientTransportConfig {
             uri: uri.into(),
+            custom_headers,
             ..Default::default()
         },
     );
@@ -579,12 +579,12 @@ async fn create_unix_socket_http_client(
         let auth_manager = oauth_flow(&uri.to_string(), &name.to_string())
             .await
             .map_err(|_| ExtensionError::SetupError("auth error".to_string()))?;
-        let auth_unix_client = UnixSocketHttpClient::new(uri, socket_path, retry_headers);
-        let auth_client = AuthClient::new(auth_unix_client, auth_manager);
+        let auth_client = AuthClient::new(unix_client, auth_manager);
         let transport = StreamableHttpClientTransport::with_client(
             auth_client,
             StreamableHttpClientTransportConfig {
                 uri: uri.into(),
+                custom_headers: retry_headers,
                 ..Default::default()
             },
         );

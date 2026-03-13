@@ -21,8 +21,6 @@ pub(crate) mod subagent_task_config;
 mod tool_confirmation_router;
 mod tool_execution;
 pub mod types;
-#[cfg(unix)]
-pub(crate) mod unix_socket_http_client;
 pub mod validate_extensions;
 
 pub use agent::{Agent, AgentConfig, AgentEvent, ExtensionLoadResult, GoosePlatform};

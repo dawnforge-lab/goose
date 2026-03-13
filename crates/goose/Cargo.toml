@@ -23,6 +23,7 @@ rmcp = { workspace = true, features = [
     "transport-child-process",
     "transport-streamable-http-client",
     "transport-streamable-http-client-reqwest",
+    "transport-streamable-http-client-unix-socket",
 ] }
 oauth2 = "5.0"
 anyhow = { workspace = true }
@@ -145,14 +146,6 @@ pastey = "0.2.1"
 shell-words = "1.1.1"
 
 # Unix domain socket HTTP transport for StreamableHttp extensions
-[target.'cfg(unix)'.dependencies]
-hyper = { version = "1", features = ["client", "http1"] }
-hyper-util = { version = "0.1", features = ["tokio"] }
-http-body-util = "0.1"
-sse-stream = "0.2"
-bytes = { workspace = true }
-http = { workspace = true }
-
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = { version = "0.3", features = ["wincred"] }
 
