@@ -1,11 +1,14 @@
 use crate::agents::extension::PlatformExtensionContext;
 use crate::agents::extension_manager::get_tool_owner;
 use crate::agents::mcp_client::{Error, McpClientTrait};
+use crate::agents::tool_execution::ToolCallContext;
 use anyhow::Result;
 use async_trait::async_trait;
 use indoc::indoc;
+use pctx_code_mode::config::ToolDisclosure;
 use pctx_code_mode::model::{CallbackConfig, ExecuteInput, GetFunctionDetailsInput};
-use pctx_code_mode::{CallbackRegistry, CodeMode};
+use pctx_code_mode::registry::{CallbackFn, PctxRegistry};
+use pctx_code_mode::CodeMode;
 use rmcp::model::{
     CallToolRequestParams, CallToolResult, Content, Implementation, InitializeResult, JsonObject,
     ListToolsResult, RawContent, Role, ServerCapabilities, Tool as McpTool, ToolAnnotations,
@@ -113,7 +116,7 @@ impl CodeExecutionClient {
             };
             cfgs.push(CallbackConfig {
                 name,
-                namespace,
+                namespace: Some(namespace),
                 description: tool.description.as_ref().map(|d| d.to_string()),
                 input_schema: Some(json!(tool.input_schema)),
                 output_schema: tool.output_schema.as_ref().map(|s| json!(s)),
@@ -162,7 +165,7 @@ impl CodeExecutionClient {
         &self,
         session_id: &str,
         code_mode: &CodeMode,
-    ) -> Result<(CallbackRegistry, ContentStore), String> {
+    ) -> Result<(PctxRegistry, ContentStore), String> {
         let manager = self
             .context
             .extension_manager
@@ -171,9 +174,9 @@ impl CodeExecutionClient {
             .ok_or("Extension manager not available")?;
 
         let content_store: ContentStore = Arc::new(std::sync::Mutex::new(HashMap::new()));
-        let registry = CallbackRegistry::default();
+        let registry = PctxRegistry::default();
         for cfg in code_mode.callbacks() {
-            let full_name = format!("{}__{}", &cfg.namespace, &cfg.name);
+            let full_name = format!("{}__{}", cfg.namespace.as_deref().unwrap_or(""), &cfg.name);
             let callback = create_tool_callback(
                 session_id.to_string(),
                 full_name,
@@ -181,7 +184,7 @@ impl CodeExecutionClient {
                 content_store.clone(),
             );
             registry
-                .add(&cfg.id(), callback)
+                .add_callback(&cfg.id(), callback)
                 .map_err(|e| format!("Failed to register callback: {e}"))?;
         }
 
@@ -240,7 +243,7 @@ impl CodeExecutionClient {
 
             rt.block_on(async move {
                 code_mode
-                    .execute(&code, Some(registry))
+                    .execute_typescript(&code, ToolDisclosure::default(), Some(registry))
                     .await
                     .map_err(|e| format!("Execution error: {e}"))
             })
@@ -306,7 +309,7 @@ fn create_tool_callback(
     full_name: String,
     manager: Arc<crate::agents::ExtensionManager>,
     content_store: ContentStore,
-) -> pctx_code_mode::CallbackFn {
+) -> CallbackFn {
     Arc::new(move |args: Option<Value>| {
         let session_id = session_id.clone();
         let full_name = full_name.clone();
@@ -320,8 +323,13 @@ fn create_tool_callback(
                 }
                 params
             };
+            let ctx = crate::agents::ToolCallContext::new(
+                session_id,
+                None,
+                Some("tool-request-id".to_string()),
+            );
             match manager
-                .dispatch_tool_call(&session_id, tool_call, None, CancellationToken::new())
+                .dispatch_tool_call(&ctx, tool_call, CancellationToken::new())
                 .await
             {
                 Ok(dispatch_result) => match dispatch_result.result.await {
@@ -464,10 +472,10 @@ impl McpClientTrait for CodeExecutionClient {
                     "list_functions".to_string(),
                     indoc! {r#"
                         List all available functions across all namespaces.
-                        
+
                         This will not return function input and output types.
                         After determining which functions are needed use
-                        get_function_details to get input and output type 
+                        get_function_details to get input and output type
                         information about specific functions.
                     "#}
                     .to_string(),
@@ -564,12 +572,12 @@ impl McpClientTrait for CodeExecutionClient {
 
     async fn call_tool(
         &self,
-        session_id: &str,
+        ctx: &ToolCallContext,
         name: &str,
         arguments: Option<JsonObject>,
-        _working_dir: Option<&str>,
         _cancellation_token: CancellationToken,
     ) -> Result<CallToolResult, Error> {
+        let session_id = &ctx.session_id;
         let result = match name {
             "list_functions" => self.handle_list_functions(session_id).await,
             "get_function_details" => {
