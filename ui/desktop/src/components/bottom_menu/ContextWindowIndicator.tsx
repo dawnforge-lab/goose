@@ -29,18 +29,18 @@ export function ContextWindowIndicator({
   tokenLimit,
   alerts,
 }: ContextWindowIndicatorProps) {
-  if (!tokenLimit) return null;
-
-  const percentage = Math.round((totalTokens / tokenLimit) * 100);
+  const percentage = tokenLimit ? Math.round((totalTokens / tokenLimit) * 100) : 0;
   const colorClass = getProgressColor(percentage);
 
   return (
     <>
       <div className="flex items-center h-full">
         <BottomMenuAlertPopover alerts={alerts} />
-        <span className={`text-xs font-mono cursor-default ${colorClass}`}>
-          {formatTokenCount(totalTokens)} / {formatTokenCount(tokenLimit)}
-        </span>
+        {tokenLimit > 0 && (
+          <span className={`text-xs font-mono cursor-default ${colorClass}`}>
+            {formatTokenCount(totalTokens)} / {formatTokenCount(tokenLimit)}
+          </span>
+        )}
       </div>
       <div className="w-px h-4 bg-border-primary mx-2" />
     </>
