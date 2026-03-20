@@ -4,7 +4,6 @@ import { z } from 'zod';
 
 /**
  * Add an extension to an active session.
- * Method: `_agent/extensions/add`
  */
 export const zAddExtensionRequest = z.object({
     session_id: z.string(),
@@ -18,7 +17,6 @@ export const zEmptyResponse = z.record(z.unknown());
 
 /**
  * Remove an extension from an active session.
- * Method: `_agent/extensions/remove`
  */
 export const zRemoveExtensionRequest = z.object({
     session_id: z.string(),
@@ -27,7 +25,6 @@ export const zRemoveExtensionRequest = z.object({
 
 /**
  * List all tools available in a session.
- * Method: `_agent/tools`
  */
 export const zGetToolsRequest = z.object({
     session_id: z.string()
@@ -39,7 +36,6 @@ export const zGetToolsResponse = z.object({
 
 /**
  * Read a resource from an extension.
- * Method: `_agent/resource/read`
  */
 export const zReadResourceRequest = z.object({
     session_id: z.string(),
@@ -53,7 +49,6 @@ export const zReadResourceResponse = z.object({
 
 /**
  * Update the working directory for a session.
- * Method: `_agent/working_dir/update`
  */
 export const zUpdateWorkingDirRequest = z.object({
     session_id: z.string(),
@@ -61,16 +56,60 @@ export const zUpdateWorkingDirRequest = z.object({
 });
 
 /**
- * List all sessions.
- * Method: `_session/list`
+ * A unique identifier for a conversation session between a client and agent.
+ *
+ * Sessions maintain their own context, conversation history, and state,
+ * allowing multiple independent interactions with the same agent.
+ *
+ * See protocol docs: [Session ID](https://agentclientprotocol.com/protocol/session-setup#session-id)
+ */
+export const zSessionId = z.string();
+
+/**
+ * **UNSTABLE**
+ *
+ * This capability is not part of the spec yet, and may be removed or changed at any point.
+ *
+ * Information about a session returned by session/list
+ */
+export const zSessionInfo = z.object({
+    sessionId: zSessionId,
+    cwd: z.string(),
+    title: z.union([
+        z.string(),
+        z.null()
+    ]).optional(),
+    updatedAt: z.union([
+        z.string(),
+        z.null()
+    ]).optional(),
+    _meta: z.union([
+        z.record(z.unknown()),
+        z.null()
+    ]).optional()
+});
+
+/**
+ * **UNSTABLE**
+ *
+ * This capability is not part of the spec yet, and may be removed or changed at any point.
+ *
+ * Response from listing sessions.
  */
 export const zListSessionsResponse = z.object({
-    sessions: z.array(z.unknown())
+    sessions: z.array(zSessionInfo),
+    nextCursor: z.union([
+        z.string(),
+        z.null()
+    ]).optional(),
+    _meta: z.union([
+        z.record(z.unknown()),
+        z.null()
+    ]).optional()
 });
 
 /**
  * Get a session by ID.
- * Method: `_session/get`
  */
 export const zGetSessionRequest = z.object({
     session_id: z.string(),
@@ -86,7 +125,6 @@ export const zGetSessionResponse = z.object({
 
 /**
  * Delete a session.
- * Method: `_session/delete`
  */
 export const zDeleteSessionRequest = z.object({
     session_id: z.string()
@@ -94,7 +132,6 @@ export const zDeleteSessionRequest = z.object({
 
 /**
  * Export a session as a JSON string.
- * Method: `_session/export`
  */
 export const zExportSessionRequest = z.object({
     session_id: z.string()
@@ -106,7 +143,6 @@ export const zExportSessionResponse = z.object({
 
 /**
  * Import a session from a JSON string.
- * Method: `_session/import`
  */
 export const zImportSessionRequest = z.object({
     data: z.string()
@@ -118,7 +154,6 @@ export const zImportSessionResponse = z.object({
 
 /**
  * List configured extensions and any warnings.
- * Method: `_config/extensions`
  */
 export const zGetExtensionsResponse = z.object({
     extensions: z.array(z.unknown()),

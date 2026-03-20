@@ -35,10 +35,6 @@ import {
   zReadResourceResponse,
 } from './zod.gen.js';
 
-/**
- * Typed client for Goose custom extension methods.
- * Wraps an ExtMethodProvider (e.g. ClientSideConnection) with proper types and Zod validation.
- */
 export class GooseExtClient {
   constructor(private conn: ExtMethodProvider) {}
 
