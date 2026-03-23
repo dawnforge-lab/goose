@@ -12,6 +12,18 @@ pub enum EventSource {
     SessionRotation,
 }
 
+impl std::fmt::Display for EventSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::User { .. } => write!(f, "user"),
+            Self::Cron(name) => write!(f, "cron:{}", name),
+            Self::Idle => write!(f, "idle"),
+            Self::Poller(name) => write!(f, "poller:{}", name),
+            Self::SessionRotation => write!(f, "session_rotation"),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum MessageRole {
     User,

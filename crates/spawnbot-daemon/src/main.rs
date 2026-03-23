@@ -1,132 +1,166 @@
-use anyhow::Result;
-use clap::{Parser, Subcommand};
-use spawnbot_common::{config::SpawnbotConfig, paths};
-use std::sync::Arc;
+//! Spawnbot daemon CLI — process management and startup.
 
-mod acp;
-mod autonomy;
-mod commands;
-mod consumer;
-mod queue;
-mod session;
-mod telegram;
+use anyhow::{Context, Result};
+use clap::Parser;
+use spawnbot_common::config::SpawnbotConfig;
+use spawnbot_common::paths::{self, WorkspacePaths};
 
-#[derive(Parser)]
-#[command(name = "spawnbot", about = "Spawnbot autonomous agent daemon")]
+#[derive(Parser, Debug)]
+#[command(name = "spawnbot", about = "Spawnbot daemon")]
 struct Cli {
     #[command(subcommand)]
-    command: Option<CliCommand>,
+    command: CliCommand,
 }
 
-#[derive(Subcommand)]
+#[derive(Parser, Debug)]
 enum CliCommand {
     /// Start the daemon
     Start {
-        #[arg(long)]
-        daemon: bool,
+        /// Path to config file (default: ~/.spawnbot/config.yaml)
+        #[arg(short, long)]
+        config: Option<String>,
     },
-    /// Run setup wizard
-    Setup,
-    /// Run diagnostics
-    Doctor,
-    /// Show configuration
-    Config,
+    /// Stop the running daemon
+    Stop,
+    /// Show daemon status
+    Status,
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter("info")
-        .init();
-
+fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Some(CliCommand::Setup) | None => {
-            // Check if already set up
-            let config_path = paths::config_path();
-            if config_path.exists() {
-                let config = SpawnbotConfig::load(&config_path)?;
-                start_daemon(config).await?;
-            } else {
-                // Run onboarding
-                let result = spawnbot_onboarding::wizard::run_onboarding()?;
-                spawnbot_onboarding::scaffold::scaffold_workspace_with_names(
-                    &result.config,
-                    &result.bot_name,
-                    &result.user_name,
-                    &result.user_role,
-                )?;
-                println!("\n  Workspace created! Starting daemon...\n");
-                start_daemon(result.config).await?;
-            }
+        CliCommand::Start { config } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(start_daemon(config))?;
         }
-        Some(CliCommand::Start { .. }) => {
-            let config = SpawnbotConfig::load(&paths::config_path())?;
-            start_daemon(config).await?;
+        CliCommand::Stop => {
+            stop_daemon()?;
         }
-        Some(CliCommand::Doctor) => {
-            println!("Running diagnostics...");
-            let config_path = paths::config_path();
-            println!(
-                "  Config:    {}",
-                if config_path.exists() { "OK" } else { "MISSING" }
-            );
-            let ws = paths::spawnbot_home().join("workspace");
-            println!(
-                "  Workspace: {}",
-                if ws.exists() { "OK" } else { "MISSING" }
-            );
-        }
-        Some(CliCommand::Config) => {
-            let config_path = paths::config_path();
-            if config_path.exists() {
-                let content = std::fs::read_to_string(&config_path)?;
-                println!("{}", content);
-            } else {
-                println!("No config found. Run `spawnbot setup` first.");
-            }
+        CliCommand::Status => {
+            show_status()?;
         }
     }
 
     Ok(())
 }
 
-async fn start_daemon(config: SpawnbotConfig) -> Result<()> {
-    tracing::info!("Starting Spawnbot daemon");
+async fn start_daemon(config_path: Option<String>) -> Result<()> {
+    // Initialize tracing
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
 
-    let workspace = spawnbot_common::paths::WorkspacePaths::new(config.workspace.clone());
-    let priority_queue = Arc::new(queue::PriorityQueue::new());
+    // Load config
+    let config_file = config_path
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(paths::config_path);
+    let config = SpawnbotConfig::load(&config_file)
+        .with_context(|| format!("Failed to load config from {}", config_file.display()))?;
 
-    // Start autonomy engine
-    let crons = autonomy::cron::load_crons(&workspace.crons_yaml()).unwrap_or_default();
-    let cron_scheduler = autonomy::cron::CronScheduler::new(crons, priority_queue.clone());
-    cron_scheduler.start().await?;
+    let workspace = WorkspacePaths::new(config.workspace.clone());
 
-    let idle_loop = autonomy::idle::IdleLoop::new(priority_queue.clone(), config.autonomy.clone());
-    let _idle_handle = tokio::spawn(async move { idle_loop.run().await });
+    // Write PID file
+    let pid_path = paths::spawnbot_home().join("daemon.pid");
+    std::fs::create_dir_all(paths::spawnbot_home())?;
+    std::fs::write(&pid_path, std::process::id().to_string())?;
 
-    let pollers = autonomy::poller::load_pollers(&workspace.pollers_yaml()).unwrap_or_default();
-    let poller_manager = autonomy::poller::PollerManager::new(
-        pollers,
-        workspace.poller_state_dir(),
-        priority_queue.clone(),
+    tracing::info!(
+        pid = std::process::id(),
+        workspace = %workspace.root().display(),
+        "Spawnbot daemon starting"
     );
-    poller_manager.start().await?;
 
-    // Start Telegram if enabled
-    if config.telegram.enabled {
-        let tg = telegram::bot::TelegramBot::new(config.telegram.clone(), priority_queue.clone());
-        tokio::spawn(async move {
-            let _ = tg.start().await;
-        });
-    }
+    // Spawn daemon heartbeat writer
+    let heartbeat_path = paths::spawnbot_home().join("daemon.heartbeat");
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
+        loop {
+            interval.tick().await;
+            let _ = std::fs::write(&heartbeat_path, chrono::Utc::now().to_rfc3339());
+        }
+    });
 
-    tracing::info!("Daemon running. Press Ctrl+C to stop.");
+    // Spawn inbox cleanup
+    let inbox_dir = workspace.inbox_dir();
+    tokio::spawn(async move {
+        spawnbot_daemon::inbox::start_inbox_cleanup(inbox_dir).await;
+    });
+
+    tracing::info!("Daemon started — press Ctrl+C to stop");
 
     // Wait for shutdown signal
-    tokio::signal::ctrl_c().await?;
-    tracing::info!("Shutting down...");
+    tokio::signal::ctrl_c()
+        .await
+        .with_context(|| "Failed to listen for Ctrl+C")?;
 
+    tracing::info!("Shutdown signal received");
+
+    // Cleanup PID file on shutdown
+    let _ = std::fs::remove_file(&pid_path);
+
+    tracing::info!("Spawnbot daemon stopped");
+    Ok(())
+}
+
+fn stop_daemon() -> Result<()> {
+    let pid_path = paths::spawnbot_home().join("daemon.pid");
+    if !pid_path.exists() {
+        println!("No running daemon found (no PID file)");
+        return Ok(());
+    }
+
+    let pid_str = std::fs::read_to_string(&pid_path)
+        .with_context(|| "Failed to read PID file")?;
+    let pid: u32 = pid_str
+        .trim()
+        .parse()
+        .with_context(|| "Invalid PID in daemon.pid")?;
+
+    // Send SIGTERM on Unix
+    #[cfg(unix)]
+    {
+        use std::process::Command;
+        let status = Command::new("kill")
+            .arg("-TERM")
+            .arg(pid.to_string())
+            .status();
+        match status {
+            Ok(s) if s.success() => {
+                println!("Sent stop signal to daemon (PID {})", pid);
+                let _ = std::fs::remove_file(&pid_path);
+            }
+            _ => {
+                println!("Failed to stop daemon (PID {}) — process may not exist", pid);
+                let _ = std::fs::remove_file(&pid_path);
+            }
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        println!("Stop command is only supported on Unix systems (PID {})", pid);
+    }
+
+    Ok(())
+}
+
+fn show_status() -> Result<()> {
+    let pid_path = paths::spawnbot_home().join("daemon.pid");
+    if pid_path.exists() {
+        let pid = std::fs::read_to_string(&pid_path)?;
+        println!("Daemon PID: {}", pid.trim());
+
+        let hb_path = paths::spawnbot_home().join("daemon.heartbeat");
+        if hb_path.exists() {
+            let hb = std::fs::read_to_string(&hb_path)?;
+            println!("Last heartbeat: {}", hb.trim());
+        }
+    } else {
+        println!("Daemon is not running");
+    }
     Ok(())
 }

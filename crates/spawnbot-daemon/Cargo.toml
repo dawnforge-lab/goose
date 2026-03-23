@@ -27,3 +27,6 @@ feed-rs = "2"
 axum = "0.8"
 clap = { version = "4", features = ["derive"] }
 ulid = "1"
+
+[dev-dependencies]
+tempfile = "3"

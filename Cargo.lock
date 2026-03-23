@@ -9151,6 +9151,7 @@ dependencies = [
  "spawnbot-identity",
  "spawnbot-onboarding",
  "teloxide",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "tokio-cron-scheduler 0.15.1",
