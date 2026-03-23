@@ -2,11 +2,9 @@
 name = "spawnbot-memory"
 version = "0.2.0"
 edition = "2021"
-
 [[bin]]
 name = "spawnbot-memory"
 path = "src/main.rs"
-
 [dependencies]
 spawnbot-common = { path = "../spawnbot-common" }
 tokio = { version = "1", features = ["full"] }
@@ -25,6 +23,5 @@ chrono = { version = "0.4", features = ["serde"] }
 dirs = "6"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 walkdir = "2"
-
 [dev-dependencies]
 tempfile = "3"

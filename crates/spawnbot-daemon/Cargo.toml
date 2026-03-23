@@ -2,11 +2,9 @@
 name = "spawnbot-daemon"
 version = "0.2.0"
 edition = "2021"
-
 [[bin]]
 name = "spawnbot"
 path = "src/main.rs"
-
 [dependencies]
 spawnbot-common = { path = "../spawnbot-common" }
 spawnbot-identity = { path = "../spawnbot-identity" }
@@ -31,6 +29,5 @@ clap = { version = "4", features = ["derive"] }
 dialoguer = "0.12"
 dirs = "6"
 ulid = "1"
-
 [dev-dependencies]
 tempfile = "3"

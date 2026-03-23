@@ -2,15 +2,15 @@
 name = "spawnbot-onboarding"
 version = "0.2.0"
 edition = "2021"
-
 [dependencies]
 spawnbot-common = { path = "../spawnbot-common" }
 spawnbot-memory = { path = "../spawnbot-memory" }
 anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
 dialoguer = { version = "0.12", features = ["fuzzy-select"] }
 console = "0.15"
 dirs = "6"
 tracing = "0.1"
-
 [dev-dependencies]
 tempfile = "3"

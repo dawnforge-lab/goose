@@ -41,13 +41,9 @@ fn main() -> Result<()> {
     match cli.command {
         // No subcommand: start if configured, otherwise guide through setup
         None => {
-            // Check if Goose is configured (provider/model)
-            let goose_config = dirs::config_dir()
-                .expect("Could not determine config directory")
-                .join("goose/config.yaml");
-            if !goose_config.exists() {
-                println!("\n  First time? Let's set up your LLM provider.\n");
-                run_configure()?;
+            // Check if provider is configured
+            if !spawnbot_onboarding::configure::is_configured() {
+                spawnbot_onboarding::configure::run_configure()?;
             }
 
             // Check if Spawnbot is configured (autonomy, telegram, etc.)
@@ -67,7 +63,7 @@ fn main() -> Result<()> {
             run_setup()?;
         }
         Some(CliCommand::Configure) => {
-            run_configure()?;
+            spawnbot_onboarding::configure::run_configure()?;
         }
         Some(CliCommand::Stop) => {
             stop_daemon()?;
@@ -103,26 +99,6 @@ fn run_setup() -> Result<()> {
 
     println!("\n  Workspace created at ~/.spawnbot/");
     println!("  Run 'spawnbot' to start.\n");
-    Ok(())
-}
-
-fn run_configure() -> Result<()> {
-    // Resolve goose binary from our install dir to avoid picking up upstream goose
-    let goose_bin = paths::spawnbot_home().join("bin").join("goose");
-    let goose_cmd = if goose_bin.exists() {
-        goose_bin.to_string_lossy().to_string()
-    } else {
-        "goose".to_string()
-    };
-
-    let status = std::process::Command::new(&goose_cmd)
-        .arg("configure")
-        .status()
-        .with_context(|| format!("Failed to run: {} configure", goose_cmd))?;
-
-    if !status.success() {
-        anyhow::bail!("Provider configuration failed");
-    }
     Ok(())
 }
 
