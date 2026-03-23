@@ -4,6 +4,8 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use spawnbot_common::config::SpawnbotConfig;
 use spawnbot_common::paths::{self, WorkspacePaths};
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 #[derive(Parser, Debug)]
 #[command(name = "spawnbot", about = "Spawnbot daemon")]
@@ -74,7 +76,82 @@ async fn start_daemon(config_path: Option<String>) -> Result<()> {
         "Spawnbot daemon starting"
     );
 
-    // Spawn daemon heartbeat writer
+    // --- Priority queue (shared across all producers and consumer) ---
+    let queue = Arc::new(spawnbot_daemon::queue::PriorityQueue::new());
+    let user_waiting = Arc::new(AtomicBool::new(false));
+
+    // --- Spawn ACP client and initialize ---
+    tracing::info!("Spawning goose ACP process");
+    let mut acp = spawnbot_daemon::acp::AcpClient::spawn("goose", &["acp"])
+        .await
+        .with_context(|| "Failed to spawn goose ACP process")?;
+    acp.initialize()
+        .await
+        .with_context(|| "Failed to initialize ACP connection")?;
+
+    // --- Session manager ---
+    let mut session_manager =
+        spawnbot_daemon::session::SessionManager::new(acp, workspace.clone());
+    session_manager
+        .start()
+        .await
+        .with_context(|| "Failed to start session manager")?;
+
+    let session = Arc::new(tokio::sync::Mutex::new(session_manager));
+
+    // --- Queue consumer (processes events by sending prompts to the LLM) ---
+    let consumer = spawnbot_daemon::consumer::QueueConsumer::new(
+        queue.clone(),
+        session.clone(),
+        user_waiting.clone(),
+    );
+    tokio::spawn(async move {
+        consumer.run().await;
+    });
+
+    // --- Cron scheduler ---
+    let cron_jobs = spawnbot_daemon::autonomy::cron::load_crons(&workspace.crons_yaml())
+        .unwrap_or_else(|e| {
+            tracing::warn!(error = %e, "Failed to load cron jobs, continuing without them");
+            vec![]
+        });
+    if !cron_jobs.is_empty() {
+        let cron_scheduler =
+            spawnbot_daemon::autonomy::cron::CronScheduler::new(cron_jobs, queue.clone())
+                .await
+                .with_context(|| "Failed to create cron scheduler")?;
+        cron_scheduler
+            .start()
+            .await
+            .with_context(|| "Failed to start cron scheduler")?;
+        // Leak the scheduler handle so it lives for the daemon lifetime.
+        // It will be cleaned up when the process exits.
+        std::mem::forget(cron_scheduler);
+    }
+
+    // --- Idle loop ---
+    let idle_loop = spawnbot_daemon::autonomy::idle::IdleLoop::new(
+        queue.clone(),
+        config.autonomy.clone(),
+    );
+    tokio::spawn(async move {
+        idle_loop.run().await;
+    });
+
+    // --- Telegram bot (if enabled) ---
+    if config.telegram.enabled {
+        let telegram_bot = spawnbot_daemon::telegram::bot::TelegramBot::new(
+            config.telegram.clone(),
+            queue.clone(),
+        );
+        tokio::spawn(async move {
+            if let Err(e) = telegram_bot.start().await {
+                tracing::error!(error = %e, "Telegram bot failed");
+            }
+        });
+    }
+
+    // --- Daemon heartbeat writer ---
     let heartbeat_path = paths::spawnbot_home().join("daemon.heartbeat");
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
@@ -84,7 +161,7 @@ async fn start_daemon(config_path: Option<String>) -> Result<()> {
         }
     });
 
-    // Spawn inbox cleanup
+    // --- Inbox cleanup ---
     let inbox_dir = workspace.inbox_dir();
     tokio::spawn(async move {
         spawnbot_daemon::inbox::start_inbox_cleanup(inbox_dir).await;
