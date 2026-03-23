@@ -1,8 +1,8 @@
 {
-  "name": "goose-app",
-  "productName": "Goose",
-  "version": "1.28.0",
-  "description": "Goose App",
+  "name": "spawnbot-app",
+  "productName": "Spawnbot",
+  "version": "0.1.0",
+  "description": "Spawnbot - Autonomous AI Agent",
   "engines": {
     "node": "^24.10.0",
     "pnpm": ">=10.30.0"

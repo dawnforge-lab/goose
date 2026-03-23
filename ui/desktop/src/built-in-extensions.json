@@ -42,5 +42,35 @@
     "enabled": false,
     "type": "builtin",
     "env_keys": []
+  },
+  {
+    "id": "spawnbot-memory",
+    "name": "Spawnbot Memory",
+    "description": "Advanced semantic memory with FTS5 search and temporal decay",
+    "enabled": true,
+    "type": "stdio",
+    "cmd": "spawnbot-memory",
+    "env_keys": [],
+    "timeout": 300
+  },
+  {
+    "id": "spawnbot-identity",
+    "name": "Spawnbot Identity",
+    "description": "Identity document management (SOUL, USER, GOALS, PLAYBOOK, HEARTBEAT)",
+    "enabled": true,
+    "type": "stdio",
+    "cmd": "spawnbot-identity",
+    "env_keys": [],
+    "timeout": 300
+  },
+  {
+    "id": "spawnbot-skills",
+    "name": "Spawnbot Skills",
+    "description": "Skill management and self-evolution with YAML-based skill definitions",
+    "enabled": true,
+    "type": "stdio",
+    "cmd": "spawnbot-skills",
+    "env_keys": [],
+    "timeout": 300
   }
 ]

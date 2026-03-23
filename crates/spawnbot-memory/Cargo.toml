@@ -1,0 +1,30 @@
+[package]
+name = "spawnbot-memory"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "spawnbot-memory"
+path = "src/main.rs"
+
+[dependencies]
+spawnbot-common = { path = "../spawnbot-common" }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+rusqlite = { version = "0.32", features = ["bundled", "vtab"] }
+rmcp = { version = "1.2", features = ["server", "transport-io", "macros"] }
+schemars = "1"
+sha2 = "0.10"
+ulid = "1"
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "6"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+walkdir = "2"
+
+[dev-dependencies]
+tempfile = "3"
