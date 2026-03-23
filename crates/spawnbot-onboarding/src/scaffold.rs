@@ -38,69 +38,15 @@ pub fn scaffold_workspace(config: &SpawnbotConfig) -> Result<()> {
     ])?;
 
     // Write identity documents (only if they don't exist — don't overwrite)
-    write_if_absent(
-        &ws.soul_md(),
-        &crate::templates::soul_md("Spawnbot", "User"),
-    )?;
-    write_if_absent(
-        &ws.user_md(),
-        &crate::templates::user_md("User", ""),
-    )?;
+    write_if_absent(&ws.soul_md(), &crate::templates::soul_md())?;
+    write_if_absent(&ws.user_md(), &crate::templates::user_md())?;
     write_if_absent(&ws.goals_md(), &crate::templates::goals_md())?;
-    write_if_absent(
-        &ws.playbook_md(),
-        &crate::templates::playbook_md(&format!("{:?}", config.autonomy.mode).to_lowercase()),
-    )?;
+    write_if_absent(&ws.playbook_md(), &crate::templates::playbook_md())?;
     write_if_absent(&ws.heartbeat_md(), &crate::templates::heartbeat_md())?;
     write_if_absent(&ws.crons_yaml(), &crate::templates::crons_yaml())?;
     write_if_absent(&ws.pollers_yaml(), &crate::templates::pollers_yaml())?;
 
     // Initialize memory database
-    spawnbot_memory::db::init_db(&ws.memory_db())?;
-
-    Ok(())
-}
-
-/// Scaffold with custom bot and user names (used by onboarding wizard).
-pub fn scaffold_workspace_with_names(
-    config: &SpawnbotConfig,
-    bot_name: &str,
-    user_name: &str,
-    user_role: &str,
-) -> Result<()> {
-    let home = paths::spawnbot_home();
-    let ws = WorkspacePaths::new(config.workspace.clone());
-
-    create_dirs(&[
-        &home,
-        &paths::skills_dir(),
-        &paths::extensions_dir(),
-    ])?;
-
-    config.save(&paths::config_path())?;
-
-    create_dirs(&[
-        ws.root(),
-        &ws.memory_dir(),
-        &ws.memory_daily(),
-        &ws.memory_entities(),
-        &ws.memory_knowledge(),
-        &ws.poller_state_dir(),
-        &ws.inbox_dir(),
-        &ws.sessions_dir(),
-    ])?;
-
-    write_if_absent(&ws.soul_md(), &crate::templates::soul_md(bot_name, user_name))?;
-    write_if_absent(&ws.user_md(), &crate::templates::user_md(user_name, user_role))?;
-    write_if_absent(&ws.goals_md(), &crate::templates::goals_md())?;
-    write_if_absent(
-        &ws.playbook_md(),
-        &crate::templates::playbook_md(&format!("{:?}", config.autonomy.mode).to_lowercase()),
-    )?;
-    write_if_absent(&ws.heartbeat_md(), &crate::templates::heartbeat_md())?;
-    write_if_absent(&ws.crons_yaml(), &crate::templates::crons_yaml())?;
-    write_if_absent(&ws.pollers_yaml(), &crate::templates::pollers_yaml())?;
-
     spawnbot_memory::db::init_db(&ws.memory_db())?;
 
     Ok(())
@@ -127,18 +73,12 @@ fn write_if_absent(path: &Path, content: &str) -> Result<()> {
 mod tests {
     use super::*;
     use spawnbot_common::config::*;
-    use spawnbot_common::types::*;
     use std::path::PathBuf;
 
     fn test_config(workspace: PathBuf) -> SpawnbotConfig {
         SpawnbotConfig {
             version: 1,
             workspace,
-            llm: LlmConfig {
-                provider: LlmProvider::Anthropic,
-                model: "claude-sonnet-4".into(),
-                api_key_env: "ANTHROPIC_API_KEY".into(),
-            },
             embeddings: EmbeddingsConfig::default(),
             whisper: WhisperConfig::default(),
             telegram: TelegramConfig::default(),
@@ -188,13 +128,11 @@ mod tests {
     }
 
     #[test]
-    fn test_scaffold_workspace_with_names() {
+    fn test_scaffold_workspace_components() {
         let dir = tempfile::tempdir().unwrap();
         let workspace = dir.path().join("workspace");
         let _config = test_config(workspace.clone());
 
-        // Temporarily override home dir paths — we test the workspace part only
-        // by directly calling the components
         let ws = WorkspacePaths::new(workspace.clone());
         create_dirs(&[
             ws.root(),
@@ -208,8 +146,8 @@ mod tests {
         ])
         .unwrap();
 
-        write_if_absent(&ws.soul_md(), &crate::templates::soul_md("TestBot", "Alice")).unwrap();
-        write_if_absent(&ws.user_md(), &crate::templates::user_md("Alice", "Dev")).unwrap();
+        write_if_absent(&ws.soul_md(), &crate::templates::soul_md()).unwrap();
+        write_if_absent(&ws.user_md(), &crate::templates::user_md()).unwrap();
         write_if_absent(&ws.goals_md(), &crate::templates::goals_md()).unwrap();
         write_if_absent(&ws.heartbeat_md(), &crate::templates::heartbeat_md()).unwrap();
 
@@ -227,7 +165,11 @@ mod tests {
 
         // Verify content
         let soul = std::fs::read_to_string(ws.soul_md()).unwrap();
-        assert!(soul.contains("TestBot"));
-        assert!(soul.contains("Alice"));
+        assert!(soul.contains("Spawnbot"));
+        assert!(soul.contains("memory_store"));
+
+        let user = std::fs::read_to_string(ws.user_md()).unwrap();
+        assert!(user.contains("User Profile"));
+        assert!(user.contains("/setup"));
     }
 }

@@ -1,9 +1,8 @@
 /// Generate SOUL.md content — the core operating instructions for the agent.
-pub fn soul_md(bot_name: &str, user_name: &str) -> String {
-    format!(
-        r#"# Operating Instructions
+pub fn soul_md() -> String {
+    r#"# Operating Instructions
 
-You are {bot_name}, a capable autonomous AI agent. You operate independently — responding in the terminal, via Telegram, executing scheduled tasks, and acting on your own initiative. You also work interactively with {user_name}.
+You are Spawnbot, a capable autonomous AI agent. You operate independently — responding in the terminal, via Telegram, executing scheduled tasks, and acting on your own initiative. You also work interactively with your user.
 
 ## Memory
 You have long-term memory via tools: `memory_store`, `memory_recall`, `memory_browse`, `memory_delete`.
@@ -53,7 +52,7 @@ Syntax:
 - `- [~]` — in progress
 - `- [x]` — completed
 
-When idle, check HEARTBEAT.md for pending or ongoing tasks and act on them. You can edit it yourself — add new tasks, mark items in progress or done, remove irrelevant tasks. {user_name} can edit it too.
+When idle, check HEARTBEAT.md for pending or ongoing tasks and act on them. You can edit it yourself — add new tasks, mark items in progress or done, remove irrelevant tasks. Your user can edit it too.
 
 ## Output Format
 - Your output is displayed in a terminal or Telegram. Keep it appropriate for these environments.
@@ -70,64 +69,22 @@ You can learn new skills and modify existing ones via the skills tools:
 - Never execute destructive operations without confirmation in approval mode
 - Log all significant actions to the changes log
 "#
-    )
-}
-
-/// Generate USER.md content.
-pub fn user_md(user_name: &str, user_role: &str) -> String {
-    format!(
-        r#"# User Profile
-
-## Name
-{user_name}
-
-## Role
-{user_role}
-
-## Communication Preferences
-(To be filled in as the agent learns your preferences)
-
-## Key Facts
-(The agent will populate this over time)
-"#
-    )
-}
-
-/// Generate GOALS.md content.
-pub fn goals_md() -> String {
-    r#"# Goals
-
-## Active Goals
-- [ ] Get familiar with this workspace
-- [ ] Set up initial configuration
-
-## Completed Goals
-(Goals will be moved here as they are completed)
-"#
     .to_string()
 }
 
-/// Generate PLAYBOOK.md content.
-pub fn playbook_md(autonomy_mode: &str) -> String {
-    format!(
-        r#"# Playbook
+/// Generate USER.md content — stub for AI completion.
+pub fn user_md() -> String {
+    "# User Profile\n\n(Run /setup to build your profile)\n".to_string()
+}
 
-## Autonomy Mode
-Current mode: **{autonomy_mode}**
+/// Generate GOALS.md content — stub for AI completion.
+pub fn goals_md() -> String {
+    "# Goals\n\n(Run /setup to set your goals)\n".to_string()
+}
 
-- **yolo**: Act on all tasks autonomously. Only pause for truly destructive operations.
-- **approval**: Pause and ask before executing any non-trivial action.
-
-## Working Style
-(Define your preferred working patterns here)
-
-## Conventions
-(Define naming conventions, code style, project structure preferences)
-
-## Boundaries
-(Define what the agent should never do without asking)
-"#
-    )
+/// Generate PLAYBOOK.md content — stub for AI completion.
+pub fn playbook_md() -> String {
+    "# Playbook\n\n(Run /setup to define your working style)\n".to_string()
 }
 
 /// Generate HEARTBEAT.md content.
@@ -194,24 +151,31 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_soul_md_contains_bot_name() {
-        let content = soul_md("TestBot", "Alice");
-        assert!(content.contains("TestBot"));
-        assert!(content.contains("Alice"));
+    fn test_soul_md_contains_key_sections() {
+        let content = soul_md();
+        assert!(content.contains("Spawnbot"));
         assert!(content.contains("memory_store"));
         assert!(content.contains("[SYSTEM:CRON]"));
     }
 
     #[test]
-    fn test_user_md_contains_user_info() {
-        let content = user_md("Alice", "Developer");
-        assert!(content.contains("Alice"));
-        assert!(content.contains("Developer"));
+    fn test_user_md_is_stub() {
+        let content = user_md();
+        assert!(content.contains("User Profile"));
+        assert!(content.contains("/setup"));
     }
 
     #[test]
-    fn test_playbook_md_contains_mode() {
-        let content = playbook_md("yolo");
-        assert!(content.contains("**yolo**"));
+    fn test_goals_md_is_stub() {
+        let content = goals_md();
+        assert!(content.contains("Goals"));
+        assert!(content.contains("/setup"));
+    }
+
+    #[test]
+    fn test_playbook_md_is_stub() {
+        let content = playbook_md();
+        assert!(content.contains("Playbook"));
+        assert!(content.contains("/setup"));
     }
 }

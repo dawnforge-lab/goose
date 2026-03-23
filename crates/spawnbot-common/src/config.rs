@@ -9,7 +9,6 @@ pub struct SpawnbotConfig {
     pub version: u32,
     #[serde(default = "default_workspace")]
     pub workspace: PathBuf,
-    pub llm: LlmConfig,
     #[serde(default)]
     pub embeddings: EmbeddingsConfig,
     #[serde(default)]
@@ -20,13 +19,6 @@ pub struct SpawnbotConfig {
     pub autonomy: AutonomyConfig,
     #[serde(default)]
     pub skills: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LlmConfig {
-    pub provider: LlmProvider,
-    pub model: String,
-    pub api_key_env: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -175,11 +167,6 @@ mod tests {
         let config = SpawnbotConfig {
             version: 1,
             workspace: PathBuf::from("/tmp/test-workspace"),
-            llm: LlmConfig {
-                provider: LlmProvider::Anthropic,
-                model: "claude-sonnet-4".into(),
-                api_key_env: "ANTHROPIC_API_KEY".into(),
-            },
             embeddings: EmbeddingsConfig::default(),
             whisper: WhisperConfig::default(),
             telegram: TelegramConfig::default(),
@@ -192,7 +179,6 @@ mod tests {
 
         assert_eq!(loaded.version, 1);
         assert_eq!(loaded.workspace, PathBuf::from("/tmp/test-workspace"));
-        assert_eq!(loaded.llm.model, "claude-sonnet-4");
         assert_eq!(loaded.autonomy.mode, AutonomyMode::Yolo);
         assert_eq!(loaded.autonomy.decay_half_life, 30);
     }
@@ -200,10 +186,7 @@ mod tests {
     #[test]
     fn test_config_defaults() {
         let yaml = r#"
-llm:
-  provider: anthropic
-  model: claude-sonnet-4
-  api_key_env: ANTHROPIC_API_KEY
+version: 1
 "#;
         let config: SpawnbotConfig = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(config.version, 1);

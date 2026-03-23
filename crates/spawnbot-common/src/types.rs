@@ -24,17 +24,6 @@ pub enum TelegramMode {
     Webhook,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum LlmProvider {
-    Anthropic,
-    Openai,
-    Google,
-    Ollama,
-    Litellm,
-    Custom,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum MemoryCategory {
